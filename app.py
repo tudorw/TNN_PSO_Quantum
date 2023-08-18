@@ -166,17 +166,30 @@ def create_qubo(weights):
 #     logging.info("Quantum annealing completed.")
 #     return optimized_weights
 
-def quantum_anneal_layer_weights(model):
+def quantum_anneal_layer_weights(model, batch_size=1000):
     logging.info("Starting quantum annealing...")
+    start_time = time.time()
+    total_weights = sum([np.prod(layer.get_weights()[0].shape) for layer in model.layers])
+    processed_weights = 0
     for i, layer in enumerate(model.layers):
         weights = layer.get_weights()[0].flatten()
-        qubo = create_qubo(weights)
-        sampler = EmbeddingComposite(DWaveSampler())
-        sampleset = sampler.sample_qubo(qubo, num_reads=1000)
-        sample = sampleset.first.sample
-        optimized_weights = np.array([sample[i] for i in range(len(weights))])
-        optimized_weights = optimized_weights.reshape(layer.get_weights()[0].shape)
-        layer.set_weights([optimized_weights])
+        for start in range(0, len(weights), batch_size):
+            end = min(start + batch_size, len(weights))
+            batch_weights = weights[start:end]
+            logging.info(f"Processing batch {start//batch_size + 1} of {len(weights)//batch_size + 1} for layer {i + 1} of {len(model.layers)}")
+            qubo = create_qubo(batch_weights)
+            sampler = EmbeddingComposite(DWaveSampler())
+            sampleset = sampler.sample_qubo(qubo, num_reads=1000)
+            sample = sampleset.first.sample
+            optimized_weights = np.array([sample[i] for i in range(len(batch_weights))])
+            weights[start:end] = optimized_weights
+            processed_weights += len(batch_weights)
+            elapsed_time = time.time() - start_time
+            estimated_total_time = elapsed_time * total_weights / processed_weights
+            estimated_remaining_time = estimated_total_time - elapsed_time
+            logging.info(f"Estimated remaining time: {estimated_remaining_time} seconds")
+        weights = weights.reshape(layer.get_weights()[0].shape)
+        layer.set_weights([weights])
     logging.info("Quantum annealing completed.")
 
 # Optimization with PSO
