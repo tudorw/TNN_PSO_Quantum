@@ -180,8 +180,8 @@ def quantum_anneal_layer_weights(model, batch_size=1000):
             batch_weights = weights[start:end]
             logging.info(f"Processing batch {start//batch_size + 1} of {len(weights)//batch_size + 1} for layer {i + 1} of {len(model.layers)}")
             qubo = create_qubo(batch_weights)
-            sampler = EmbeddingComposite(DWaveSampler())
-            sampleset = sampler.sample_qubo(qubo, num_reads=1000)
+            sampler = LeapHybridSampler()
+            sampleset = sampler.sample_qubo(qubo)
             sample = sampleset.first.sample
             optimized_weights = np.array([sample[i] for i in range(len(batch_weights))])
             weights[start:end] = optimized_weights
