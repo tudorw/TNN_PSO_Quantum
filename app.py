@@ -134,13 +134,15 @@ def continuous_weights(discretized_weights, min_weight, step):
     logging.info("Converting weights to continuous...")
     return discretized_weights * step + min_weight
 
-def create_qubo(weights):
+def create_qubo(weights, sample_size=1000):
     logging.info("Creating QUBO...")
-    A = np.random.rand(len(weights), len(weights))
-    b = np.random.rand(len(weights))
+    sample_indices = np.random.choice(len(weights), size=sample_size, replace=False)
+    sampled_weights = weights[sample_indices]
+    A = np.random.rand(sample_size, sample_size)
+    b = np.random.rand(sample_size)
     Q = {}
-    for i in range(len(weights)):
-        for j in range(len(weights)):
+    for i in range(sample_size):
+        for j in range(sample_size):
             if i == j:
                 Q[(i, j)] = b[i]
             else:
