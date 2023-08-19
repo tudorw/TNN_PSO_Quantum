@@ -123,6 +123,8 @@ def create_tensegrity_model(learning_rate=0.01):
 # Quantum Annealing Integration
 def discretize_weights(weights, num_bits=8):
     logging.info("Discretizing weights...")
+    # Discretization is necessary because quantum annealers can only solve discrete optimization problems.
+    # Reference: Lucas, Andrew. "Ising formulations of many NP problems." Frontiers in Physics 2 (2014): 5.
     min_weight = np.min(weights)
     max_weight = np.max(weights)
     step = (max_weight - min_weight) / (2**num_bits - 1)
@@ -132,10 +134,14 @@ def discretize_weights(weights, num_bits=8):
 
 def continuous_weights(discretized_weights, min_weight, step):
     logging.info("Converting weights to continuous...")
+    # After the quantum annealing process, we need to convert the weights back to continuous values.
+    # Reference: Lucas, Andrew. "Ising formulations of many NP problems." Frontiers in Physics 2 (2014): 5.
     return discretized_weights * step + min_weight
 
 def create_qubo(weights, sample_size=1000):
     logging.info("Creating QUBO...")
+    # Ensure sample_size is not larger than the size of weights
+    sample_size = min(sample_size, len(weights))
     sample_indices = np.random.choice(len(weights), size=sample_size, replace=False)
     sampled_weights = weights[sample_indices]
     A = np.random.rand(sample_size, sample_size)
@@ -150,46 +156,50 @@ def create_qubo(weights, sample_size=1000):
     logging.info("QUBO created.")
     return Q
 
-# def quantum_anneal(weights):
-#     qubo = create_qubo(weights)
-#     sampler = LeapHybridSampler()
-#     sampleset = sampler.sample_qubo(qubo)
-#     sample = sampleset.first.sample
-#     optimized_weights = np.array([sample[i] for i in range(len(weights))])
-#     return optimized_weights
-
-# def quantum_anneal(weights):
-#     logging.info("Starting quantum annealing...")
-#     qubo = create_qubo(weights)
-#     sampler = EmbeddingComposite(DWaveSampler())
-#     sampleset = sampler.sample_qubo(qubo, num_reads=1000)
-#     sample = sampleset.first.sample
-#     optimized_weights = np.array([sample[i] for i in range(len(weights))])
-#     logging.info("Quantum annealing completed.")
-#     return optimized_weights
-
-def quantum_anneal_layer_weights(model, batch_size=1000):
+def quantum_anneal_layer_weights(model, batch_size=1000, num_passes=5, patience=2, mutation_rate=0.1):
     logging.info("Starting quantum annealing...")
+    # Quantum annealing is a global optimization method that uses quantum mechanics to find the minimum of a function.
+    # Reference: Kadowaki, Tadashi, and Hidetoshi Nishimori. "Quantum annealing in the transverse Ising model." Physical Review E 58.5 (1998): 5355.
     start_time = time.time()
     total_weights = sum([np.prod(layer.get_weights()[0].shape) for layer in model.layers])
     processed_weights = 0
     for i, layer in enumerate(model.layers):
         weights = layer.get_weights()[0].flatten()
-        for start in range(0, len(weights), batch_size):
-            end = min(start + batch_size, len(weights))
-            batch_weights = weights[start:end]
-            logging.info(f"Processing batch {start//batch_size + 1} of {len(weights)//batch_size + 1} for layer {i + 1} of {len(model.layers)}")
-            qubo = create_qubo(batch_weights)
-            sampler = LeapHybridSampler()
-            sampleset = sampler.sample_qubo(qubo)
-            sample = sampleset.first.sample
-            optimized_weights = np.array([sample[i] for i in range(len(batch_weights))])
-            weights[start:end] = optimized_weights
-            processed_weights += len(batch_weights)
-            elapsed_time = time.time() - start_time
-            estimated_total_time = elapsed_time * total_weights / processed_weights
-            estimated_remaining_time = estimated_total_time - elapsed_time
-            logging.info(f"Estimated remaining time: {estimated_remaining_time} seconds")
+        best_weights = None
+        best_fitness = float('inf')
+        no_improvement_count = 0
+        for pass_num in range(num_passes):
+            logging.info(f"Starting pass {pass_num+1} of {num_passes}")
+            for start in range(0, len(weights), batch_size):
+                end = min(start + batch_size, len(weights))
+                batch_weights = weights[start:end]
+                logging.info(f"Processing batch {start//batch_size + 1} of {len(weights)//batch_size + 1} for layer {i + 1} of {len(model.layers)}")
+                qubo = create_qubo(batch_weights)
+                sampler = LeapHybridSampler()
+                sampleset = sampler.sample_qubo(qubo)
+                sample = sampleset.first.sample
+                optimized_weights = np.array([sample[i] for i in range(len(batch_weights))])
+                weights[start:end] = optimized_weights
+                processed_weights += len(batch_weights)
+                elapsed_time = time.time() - start_time
+                estimated_total_time = elapsed_time * total_weights / processed_weights
+                estimated_remaining_time = estimated_total_time - elapsed_time
+                logging.info(f"Estimated remaining time: {estimated_remaining_time} seconds")
+            fitness = objective_function(weights)
+            if fitness < best_fitness:
+                best_fitness = fitness
+                best_weights = weights.copy()
+                no_improvement_count = 0
+            else:
+                no_improvement_count += 1
+                if no_improvement_count >= patience:
+                    logging.info(f"No improvement after {patience} passes, stopping early.")
+                    break
+                weights = best_weights.copy()  # revert to the best weights
+            # Mutation
+            for _ in range(int(mutation_rate * len(weights))):
+                mutation_index = quantum_random_number() % len(weights)
+                weights[mutation_index] = quantum_random_number() % 2**32
         weights = weights.reshape(layer.get_weights()[0].shape)
         layer.set_weights([weights])
     logging.info("Quantum annealing completed.")
