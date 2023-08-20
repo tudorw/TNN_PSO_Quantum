@@ -44,9 +44,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logging.info("Logging is set up.")
 
 # Generate Quantum Random Number for initial randomness
+sampler = EmbeddingComposite(DWaveSampler())
+
 def quantum_random_number(num_qubits=5):
     logging.info("Generating quantum random number...")
-    sampler = EmbeddingComposite(DWaveSampler())
     response = sampler.sample_ising({i: 0.0 for i in range(num_qubits)}, {}, num_reads=1)
     most_common = next(iter(response)).values()
     logging.info("Quantum random number generated.")
@@ -137,6 +138,8 @@ def continuous_weights(discretized_weights, min_weight, step):
     # After the quantum annealing process, we need to convert the weights back to continuous values.
     # Reference: Lucas, Andrew. "Ising formulations of many NP problems." Frontiers in Physics 2 (2014): 5.
     return discretized_weights * step + min_weight
+
+sampler = LeapHybridSampler()
 
 def create_qubo(weights, sample_size=1000):
     logging.info("Creating QUBO...")
