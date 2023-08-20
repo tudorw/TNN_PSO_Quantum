@@ -14,6 +14,8 @@ from keras.callbacks import Callback
 from pyswarm import pso
 import types
 from keras.callbacks import ModelCheckpoint
+from keras.callbacks import EarlyStopping
+from keras.callbacks import LearningRateScheduler
 from tqdm import tqdm
 # Keep a reference to the original pso function
 original_pso = pso
@@ -110,12 +112,12 @@ def tensegrity_initializer(shape, dtype=None):
     return tw.get_normalized_weights()
 
 # Neural Network Model
-def create_tensegrity_model(learning_rate=0.01):
+def create_tensegrity_model(learning_rate=0.01, lstm_units=150, batch_size=16):
     logging.info("Creating tensegrity model...")
     model = Sequential()
     model.add(Embedding(total_words, 100, input_length=max_sequence_len-1, embeddings_initializer=tensegrity_initializer))
-    model.add(LSTM(150, return_sequences=True, kernel_initializer=tensegrity_initializer))
-    model.add(LSTM(100, kernel_initializer=tensegrity_initializer))
+    model.add(LSTM(lstm_units, return_sequences=True, kernel_initializer=tensegrity_initializer))
+    model.add(LSTM(lstm_units, kernel_initializer=tensegrity_initializer))
     model.add(Dense(total_words, activation='softmax', kernel_initializer=tensegrity_initializer))
     model.compile(loss='categorical_crossentropy', optimizer=Adam(learning_rate=learning_rate), metrics=['accuracy'])
     logging.info("Tensegrity model created.")
@@ -215,21 +217,29 @@ def objective_function(params):
     
     logging.info(f"Starting call {call_count} of objective function...")
     learning_rate = params[0]
-    model = create_tensegrity_model(learning_rate)
+    lstm_units = int(params[1])
+    batch_size = int(params[2])
+    model = create_tensegrity_model(learning_rate, lstm_units, batch_size)
     logging.info("Create Tensegrity model completed...")
 
     # Create a ModelCheckpoint callback
     checkpoint = ModelCheckpoint('best_model.h5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+    early_stopping = EarlyStopping(monitor='val_loss', patience=3)
+
+    def lr_schedule(epoch):
+        return learning_rate * (0.1 ** int(epoch / 10))
+
+    lr_scheduler = LearningRateScheduler(lr_schedule)
 
     # Pass the callback to the fit method
-    history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=5, batch_size=16, verbose=2, callbacks=[PSOProgressLogger(), checkpoint])
+    history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=5, batch_size=batch_size, verbose=2, callbacks=[PSOProgressLogger(), checkpoint, early_stopping, lr_scheduler])
     logging.info("model fit complete...")
     val_accuracy = history.history['val_accuracy'][-1]
     logging.info("Objective function completed.")
     return 1 - val_accuracy
 
-lb = [0.001]
-ub = [0.1]
+lb = [0.001, 50, 10]  # lower bounds for learning rate, LSTM units, and batch size
+ub = [0.1, 200, 32]  # upper bounds for learning rate, LSTM units, and batch size
 
 # Log the start time of the PSO optimization
 logging.info("Starting PSO optimization...")
@@ -261,19 +271,6 @@ logging.info(f"Validation accuracy: {accuracy}")
 logging.info("Saving model...")
 model.save('tensegrity_model.h5')
 logging.info("Model saved as 'tensegrity_model.h5'")
-
-# # Quantum Annealing for Embedding Layer
-# logging.info("Starting quantum annealing for embedding layer...")
-# start_time = time.time()
-# embedding_weights = model.layers[0].get_weights()[0].flatten()
-# discretized_weights, min_weight, step = discretize_weights(embedding_weights)
-# optimized_discretized_weights = quantum_anneal(discretized_weights)
-# optimized_weights = continuous_weights(optimized_discretized_weights, min_weight, step)
-# optimized_weights = optimized_weights.reshape(model.layers[0].get_weights()[0].shape)
-# model.layers[0].set_weights([optimized_weights])
-# end_time = time.time()
-# logging.info(f"Quantum annealing completed in {end_time - start_time} seconds")
-# Quantum Annealing for Each Layer
 
 logging.info("Starting quantum annealing for each layer...")
 start_time = time.time()
