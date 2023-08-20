@@ -21,6 +21,10 @@ from tqdm import tqdm
 original_pso = pso
 
 def pso_with_logging(*args, **kwargs):
+    """
+    This function logs the result of the Particle Swarm Optimization (PSO) algorithm.
+    It calls the original PSO function and logs the best position and score.
+    """
     # Call the original pso function
     xopt, fopt = original_pso(*args, **kwargs)
 
@@ -34,6 +38,10 @@ pso = pso_with_logging
 
 # define callback for keras
 class PSOProgressLogger(Callback):
+    """
+    This class is a callback for Keras that logs the progress of the training process.
+    It logs the epoch number, train loss, train accuracy, validation loss, and validation accuracy at the end of each epoch.
+    """
     def on_epoch_end(self, epoch, logs=None):
         logging.info(f"Finished epoch {epoch+1}")
         logging.info(f"Train loss: {logs['loss']}")
@@ -49,6 +57,10 @@ logging.info("Logging is set up.")
 sampler = EmbeddingComposite(DWaveSampler())
 
 def quantum_random_number(num_qubits=5):
+    """
+    This function generates a quantum random number using a D-Wave quantum computer.
+    It uses the Ising model to generate the random number.
+    """
     logging.info("Generating quantum random number...")
     response = sampler.sample_ising({i: 0.0 for i in range(num_qubits)}, {}, num_reads=1)
     most_common = next(iter(response)).values()
@@ -89,6 +101,10 @@ logging.info("Data split into training and validation sets.")
 
 # Tensegrity Weight Representation
 class TensegrityWeights:
+    """
+    This class represents the weights of a Tensegrity structure.
+    It includes methods for initializing the weights, getting normalized weights, and updating the stiffness of the weights.
+    """
     def __init__(self, shape):
         logging.info("Initializing TensegrityWeights...")
         self.stiffness = np.random.rand(*shape) * 10
@@ -96,10 +112,16 @@ class TensegrityWeights:
         logging.info("TensegrityWeights initialized.")
 
     def get_normalized_weights(self):
+        """
+        This method returns the normalized weights of the Tensegrity structure.
+        """
         logging.info("Getting normalized weights...")
         return self.stiffness / 10
 
     def update_stiffness(self, weight_updates):
+        """
+        This method updates the stiffness of the weights of the Tensegrity structure.
+        """
         logging.info("Updating stiffness...")
         adjustment = weight_updates * 10
         self.stiffness += adjustment
@@ -107,12 +129,18 @@ class TensegrityWeights:
         logging.info("Stiffness updated.")
 
 def tensegrity_initializer(shape, dtype=None):
+    """
+    This function initializes a Tensegrity structure with a given shape.
+    """
     logging.info("Initializing tensegrity...")
     tw = TensegrityWeights(shape)
     return tw.get_normalized_weights()
 
 # Neural Network Model
 def create_tensegrity_model(learning_rate=0.01, lstm_units=150, batch_size=16):
+    """
+    This function creates a Tensegrity model with a given learning rate, number of LSTM units, and batch size.
+    """
     logging.info("Creating tensegrity model...")
     model = Sequential()
     model.add(Embedding(total_words, 100, input_length=max_sequence_len-1, embeddings_initializer=tensegrity_initializer))
@@ -125,9 +153,11 @@ def create_tensegrity_model(learning_rate=0.01, lstm_units=150, batch_size=16):
 
 # Quantum Annealing Integration
 def discretize_weights(weights, num_bits=8):
+    """
+    This function discretizes the weights for quantum annealing.
+    It is necessary because quantum annealers can only solve discrete optimization problems.
+    """
     logging.info("Discretizing weights...")
-    # Discretization is necessary because quantum annealers can only solve discrete optimization problems.
-    # Reference: Lucas, Andrew. "Ising formulations of many NP problems." Frontiers in Physics 2 (2014): 5.
     min_weight = np.min(weights)
     max_weight = np.max(weights)
     step = (max_weight - min_weight) / (2**num_bits - 1)
@@ -136,14 +166,18 @@ def discretize_weights(weights, num_bits=8):
     return discretized_weights, min_weight, step
 
 def continuous_weights(discretized_weights, min_weight, step):
+    """
+    This function converts the discretized weights back to continuous values after the quantum annealing process.
+    """
     logging.info("Converting weights to continuous...")
-    # After the quantum annealing process, we need to convert the weights back to continuous values.
-    # Reference: Lucas, Andrew. "Ising formulations of many NP problems." Frontiers in Physics 2 (2014): 5.
     return discretized_weights * step + min_weight
 
 sampler = LeapHybridSampler()
 
 def create_qubo(weights, sample_size=1000):
+    """
+    This function creates a Quadratic Unconstrained Binary Optimization (QUBO) problem for the quantum annealing process.
+    """
     logging.info("Creating QUBO...")
     # Ensure sample_size is not larger than the size of weights
     sample_size = min(sample_size, len(weights))
@@ -162,9 +196,11 @@ def create_qubo(weights, sample_size=1000):
     return Q
 
 def quantum_anneal_layer_weights(model, batch_size=1000, num_passes=5, patience=2, mutation_rate=0.1):
+    """
+    This function performs quantum annealing on the weights of each layer of the model.
+    Quantum annealing is a global optimization method that uses quantum mechanics to find the minimum of a function.
+    """
     logging.info("Starting quantum annealing...")
-    # Quantum annealing is a global optimization method that uses quantum mechanics to find the minimum of a function.
-    # Reference: Kadowaki, Tadashi, and Hidetoshi Nishimori. "Quantum annealing in the transverse Ising model." Physical Review E 58.5 (1998): 5355.
     start_time = time.time()
     total_weights = sum([np.prod(layer.get_weights()[0].shape) for layer in model.layers])
     processed_weights = 0
@@ -212,6 +248,11 @@ def quantum_anneal_layer_weights(model, batch_size=1000, num_passes=5, patience=
 # Optimization with PSO
 call_count = 0
 def objective_function(params):
+    """
+    This function is the objective function for the Particle Swarm Optimization (PSO) algorithm.
+    It creates a Tensegrity model with the given parameters and trains it.
+    The objective is to minimize the validation loss.
+    """
     global call_count
     call_count += 1
     
@@ -278,8 +319,17 @@ quantum_anneal_layer_weights(model)
 end_time = time.time()
 logging.info(f"Quantum annealing completed in {end_time - start_time} seconds")
 
+# Evaluate the model on the validation set after quantum annealing
+logging.info("Evaluating model after quantum annealing...")
+loss, accuracy = model.evaluate(X_val, y_val, verbose=0)
+logging.info(f"Validation loss after quantum annealing: {loss}")
+logging.info(f"Validation accuracy after quantum annealing: {accuracy}")
+
 # Prediction function
 def predict_next_word(model, tokenizer, text_sequence):
+    """
+    This function predicts the next word in a given text sequence using the trained model.
+    """
     logging.info("Predicting next word...")
     encoded_sequence = tokenizer.texts_to_sequences([text_sequence])[0]
     encoded_sequence = pad_sequences([encoded_sequence], maxlen=max_sequence_len-1, truncating='pre')
