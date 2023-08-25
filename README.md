@@ -1,3 +1,6 @@
+# An experiment. 'A taste of things to come'
+# The implementation is derived from a conversation about Tensegrity and Multi-Dimensional Topology with GPT4 and Cursor.so, I wanted to find out if 'AI' would allow me to program in a field where my knowledge was close to zero, could we discuss in human language topics that GPT4 knows deeply, and produce working code from a theoretical approach. This is the result. If you would like to know more, or see the conversation, just drop me a message.
+
 # Tensegrity Model with Quantum Enhancements
 
 This repository contains a novel Tensegrity-based neural network model with integrated quantum enhancements for improved optimization and randomness.
